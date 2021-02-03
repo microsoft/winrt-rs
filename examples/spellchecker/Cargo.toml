@@ -5,5 +5,5 @@ authors = ["Microsoft"]
 edition = "2018"
 
 [dependencies]
-spellchecker_bindings = { path = "./bindings" }
+bindings = { package = "spellchecker_bindings", path = "bindings" }
 windows = { path = "../.." }

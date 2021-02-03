@@ -96,6 +96,9 @@ impl ErrorCode {
     /// The operation succeeded.
     pub const S_OK: ErrorCode = ErrorCode(0);
 
+    /// Completed without error, but only partial results were obtained.
+    pub const S_FALSE: ErrorCode = ErrorCode(1);
+
     /// The COM runtime has not been loaded.
     pub const CO_E_NOTINITIALIZED: ErrorCode = ErrorCode(0x8004_01F0);
 

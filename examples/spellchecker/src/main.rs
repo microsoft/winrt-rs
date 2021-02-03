@@ -1,4 +1,4 @@
-use spellchecker_bindings::windows::win32;
+use bindings::windows::win32;
 use win32::{com, intl};
 use windows::*;
 
@@ -6,15 +6,16 @@ fn main() -> windows::Result<()> {
     let input = std::env::args()
         .nth(1)
         .expect("Expected one command line argument for text to be spell-corrected");
+    // Initialize the COM runtime for this thread
     windows::initialize_mta()?;
 
     // Create ISpellCheckerFactory
     let factory: intl::ISpellCheckerFactory = windows::create_instance(&intl::SpellCheckerFactory)?;
 
     // Make sure that the "en-US" locale is supported
-    let mut supported: BOOL = false.into();
+    let mut supported = FALSE;
     let locale: Vec<u16> = "en-US\0".encode_utf16().collect();
-    // https://github.com/microsoft/windows-rs/issues/489
+    // TODO: Wrong type for second arg - https://github.com/microsoft/win32metadata/issues/201
     factory
         .IsSupported(locale.as_ptr(), &mut supported.0)
         .ok()?;
@@ -23,7 +24,6 @@ fn main() -> windows::Result<()> {
     // Create a ISpellChecker
     let mut checker = None;
     factory
-        // https://github.com/microsoft/windows-rs/issues/486
         .CreateSpellChecker(locale.as_ptr(), &mut checker)
         .ok()?;
     let checker = checker.unwrap();
@@ -31,17 +31,20 @@ fn main() -> windows::Result<()> {
     // Get errors enumerator for the supplied string
     let mut errors = None;
     let text: Vec<u16> = input.encode_utf16().collect();
-    // https://github.com/microsoft/windows-rs/issues/486
-    checker.Check(text.as_ptr(), &mut errors).ok()?;
+    checker
+        .ComprehensiveCheck(text.as_ptr(), &mut errors)
+        .ok()?;
     let errors = errors.unwrap();
 
     // Loop through all the errors
     loop {
         // Get the next error in the enumerator
         let mut error = None;
-        if errors.Next(&mut error) != windows::ErrorCode::S_OK {
+        let result = errors.Next(&mut error);
+        if result == windows::ErrorCode::S_FALSE {
             break;
         }
+        result.ok()?;
         let error = error.unwrap();
 
         // Get the start index and length of the error
@@ -52,6 +55,7 @@ fn main() -> windows::Result<()> {
 
         // Get the substring from the ut8 encoded string
         let substring = &input[start_index as usize..(start_index + length) as usize];
+        // TODO: support wide strings - https://github.com/microsoft/windows-rs/issues/484
         // Get the subtext from the wide string
         let mut subtext = text[start_index as usize..(start_index + length) as usize].to_vec();
         // Make sure the widestring ends in a null byte
@@ -61,7 +65,7 @@ fn main() -> windows::Result<()> {
         let mut action = intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_NONE;
         error.get_CorrectiveAction(&mut action).ok()?;
 
-        // https://github.com/microsoft/windows-rs/issues/490
+        // TODO: support pattern matching - https://github.com/microsoft/windows-rs/issues/490
         if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_DELETE {
             println!("Delete '{}'", substring);
         } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_REPLACE {
@@ -84,11 +88,11 @@ fn main() -> windows::Result<()> {
             loop {
                 // Get the next suggestion breaking if the call to `Next` failed
                 let mut suggestion = std::ptr::null_mut();
-                if suggestions.Next(1, &mut suggestion, std::ptr::null_mut())
-                    != windows::ErrorCode::S_OK
-                {
+                let result = suggestions.Next(1, &mut suggestion, std::ptr::null_mut());
+                if result == windows::ErrorCode::S_FALSE {
                     break;
                 }
+                result.ok()?;
 
                 // Convert the `suggestion` wide string to a Rust String
                 let answer = unsafe { read_to_string(suggestion) };
