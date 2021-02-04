@@ -16,31 +16,37 @@ fn main() -> windows::Result<()> {
     let mut supported = FALSE;
     let locale: Vec<u16> = "en-US\0".encode_utf16().collect();
     // TODO: Wrong type for second arg - https://github.com/microsoft/win32metadata/issues/201
-    factory
-        .IsSupported(locale.as_ptr(), &mut supported.0)
-        .ok()?;
+    unsafe {
+        factory
+            .IsSupported(locale.as_ptr(), &mut supported.0)
+            .ok()?
+    };
     supported.expect("en-US is supported");
 
     // Create a ISpellChecker
     let mut checker = None;
-    factory
-        .CreateSpellChecker(locale.as_ptr(), &mut checker)
-        .ok()?;
+    unsafe {
+        factory
+            .CreateSpellChecker(locale.as_ptr(), &mut checker)
+            .ok()?
+    };
     let checker = checker.unwrap();
 
     // Get errors enumerator for the supplied string
     let mut errors = None;
     let text: Vec<u16> = input.encode_utf16().collect();
-    checker
-        .ComprehensiveCheck(text.as_ptr(), &mut errors)
-        .ok()?;
+    unsafe {
+        checker
+            .ComprehensiveCheck(text.as_ptr(), &mut errors)
+            .ok()?
+    };
     let errors = errors.unwrap();
 
     // Loop through all the errors
     loop {
         // Get the next error in the enumerator
         let mut error = None;
-        let result = errors.Next(&mut error);
+        let result = unsafe { errors.Next(&mut error) };
         if result == windows::ErrorCode::S_FALSE {
             break;
         }
@@ -50,8 +56,10 @@ fn main() -> windows::Result<()> {
         // Get the start index and length of the error
         let mut start_index = 0u32;
         let mut length = 0u32;
-        error.get_StartIndex(&mut start_index).ok()?;
-        error.get_Length(&mut length).ok()?;
+        unsafe {
+            error.get_StartIndex(&mut start_index).ok()?;
+            error.get_Length(&mut length).ok()?;
+        }
 
         // Get the substring from the ut8 encoded string
         let substring = &input[start_index as usize..(start_index + length) as usize];
@@ -63,7 +71,7 @@ fn main() -> windows::Result<()> {
 
         // Get the corrective action
         let mut action = intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_NONE;
-        error.get_CorrectiveAction(&mut action).ok()?;
+        unsafe { error.get_CorrectiveAction(&mut action).ok()? };
 
         // TODO: support pattern matching - https://github.com/microsoft/windows-rs/issues/490
         if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_DELETE {
@@ -71,7 +79,7 @@ fn main() -> windows::Result<()> {
         } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_REPLACE {
             // Get the replacement as a widestring and convert to a Rust String
             let mut replacement: *mut u16 = std::ptr::null_mut();
-            error.get_Replacement(&mut replacement).ok()?;
+            unsafe { error.get_Replacement(&mut replacement).ok()? };
             let answer = unsafe { read_to_string(replacement) };
 
             println!("Replace: {} with {}", substring, answer);
@@ -81,14 +89,14 @@ fn main() -> windows::Result<()> {
         } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_GET_SUGGESTIONS {
             // Get an enumerator for all the suggestions for a substring
             let mut suggestions = None;
-            checker.Suggest(subtext.as_ptr(), &mut suggestions).ok()?;
+            unsafe { checker.Suggest(subtext.as_ptr(), &mut suggestions).ok()? };
             let suggestions = suggestions.unwrap();
 
             // Loop through the suggestions
             loop {
                 // Get the next suggestion breaking if the call to `Next` failed
                 let mut suggestion = std::ptr::null_mut();
-                let result = suggestions.Next(1, &mut suggestion, std::ptr::null_mut());
+                let result = unsafe { suggestions.Next(1, &mut suggestion, std::ptr::null_mut()) };
                 if result == windows::ErrorCode::S_FALSE {
                     break;
                 }
