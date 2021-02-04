@@ -1,5 +1,5 @@
 use bindings::windows::win32;
-use win32::{com, intl};
+use win32::intl;
 use windows::*;
 
 fn main() -> windows::Result<()> {
@@ -78,14 +78,14 @@ fn main() -> windows::Result<()> {
             println!("Delete '{}'", substring);
         } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_REPLACE {
             // Get the replacement as a widestring and convert to a Rust String
-            let mut replacement: *mut u16 = std::ptr::null_mut();
-            unsafe { error.get_Replacement(&mut replacement).ok()? };
-            let answer = unsafe { read_to_string(replacement) };
+            let mut replacement = CoString::new();
+            unsafe {
+                error
+                    .get_Replacement(&mut replacement as *mut _ as _)
+                    .ok()?
+            };
 
-            println!("Replace: {} with {}", substring, answer);
-
-            // Free the wide string's memory
-            unsafe { com::CoTaskMemFree(replacement as _) };
+            println!("Replace: {} with {}", substring, replacement);
         } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_GET_SUGGESTIONS {
             // Get an enumerator for all the suggestions for a substring
             let mut suggestions = None;
@@ -95,39 +95,18 @@ fn main() -> windows::Result<()> {
             // Loop through the suggestions
             loop {
                 // Get the next suggestion breaking if the call to `Next` failed
-                let mut suggestion = std::ptr::null_mut();
-                let result = unsafe { suggestions.Next(1, &mut suggestion, std::ptr::null_mut()) };
+                let mut suggestion = windows::CoString::new();
+                let result = unsafe {
+                    suggestions.Next(1, &mut suggestion as *mut _ as _, std::ptr::null_mut())
+                };
                 if result == windows::ErrorCode::S_FALSE {
                     break;
                 }
                 result.ok()?;
 
-                // Convert the `suggestion` wide string to a Rust String
-                let answer = unsafe { read_to_string(suggestion) };
-
-                println!("Maybe replace: {} with {}", substring, answer);
-
-                // Free the wide string's memory
-                unsafe { com::CoTaskMemFree(suggestion as _) };
+                println!("Maybe replace: {} with {}", substring, suggestion);
             }
         }
     }
     Ok(())
-}
-
-/// Assumes a valid pointer to a wide string
-unsafe fn read_to_string(ptr: *const u16) -> String {
-    let mut len = 0usize;
-    let mut cursor = ptr;
-    loop {
-        let val = cursor.read();
-        if val == 0 {
-            break;
-        }
-        len += 1;
-        cursor = cursor.add(1);
-    }
-
-    let slice = std::slice::from_raw_parts(ptr, len);
-    String::from_utf16(slice).unwrap()
 }
