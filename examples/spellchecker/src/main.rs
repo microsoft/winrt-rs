@@ -74,38 +74,43 @@ fn main() -> windows::Result<()> {
         unsafe { error.get_CorrectiveAction(&mut action).ok()? };
 
         // TODO: support pattern matching - https://github.com/microsoft/windows-rs/issues/490
-        if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_DELETE {
-            println!("Delete '{}'", substring);
-        } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_REPLACE {
-            // Get the replacement as a widestring and convert to a Rust String
-            let mut replacement = CoString::new();
-            unsafe {
-                error
-                    .get_Replacement(&mut replacement as *mut _ as _)
-                    .ok()?
-            };
-
-            println!("Replace: {} with {}", substring, replacement);
-        } else if action == intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_GET_SUGGESTIONS {
-            // Get an enumerator for all the suggestions for a substring
-            let mut suggestions = None;
-            unsafe { checker.Suggest(subtext.as_ptr(), &mut suggestions).ok()? };
-            let suggestions = suggestions.unwrap();
-
-            // Loop through the suggestions
-            loop {
-                // Get the next suggestion breaking if the call to `Next` failed
-                let mut suggestion = windows::CoString::new();
-                let result = unsafe {
-                    suggestions.Next(1, &mut suggestion as *mut _ as _, std::ptr::null_mut())
-                };
-                if result == windows::ErrorCode::S_FALSE {
-                    break;
-                }
-                result.ok()?;
-
-                println!("Maybe replace: {} with {}", substring, suggestion);
+        match action {
+            intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_DELETE => {
+                println!("Delete '{}'", substring);
             }
+            intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_REPLACE => {
+                // Get the replacement as a widestring and convert to a Rust String
+                let mut replacement = CoString::new();
+                unsafe {
+                    error
+                        .get_Replacement(&mut replacement as *mut _ as _)
+                        .ok()?
+                };
+
+                println!("Replace: {} with {}", substring, replacement);
+            }
+            intl::CORRECTIVE_ACTION::CORRECTIVE_ACTION_GET_SUGGESTIONS => {
+                // Get an enumerator for all the suggestions for a substring
+                let mut suggestions = None;
+                unsafe { checker.Suggest(subtext.as_ptr(), &mut suggestions).ok()? };
+                let suggestions = suggestions.unwrap();
+
+                // Loop through the suggestions
+                loop {
+                    // Get the next suggestion breaking if the call to `Next` failed
+                    let mut suggestion = windows::CoString::new();
+                    let result = unsafe {
+                        suggestions.Next(1, &mut suggestion as *mut _ as _, std::ptr::null_mut())
+                    };
+                    if result == windows::ErrorCode::S_FALSE {
+                        break;
+                    }
+                    result.ok()?;
+
+                    println!("Maybe replace: {} with {}", substring, suggestion);
+                }
+            }
+            _ => {}
         }
     }
     Ok(())
