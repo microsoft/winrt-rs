@@ -1,6 +1,6 @@
-# Getting Started 
+# Getting Started
 
-This tutorial will show the basics of how to use the `windows` crate. 
+This tutorial will show the basics of how to use the `windows` crate.
 
 This is *not* meant as a tutorial on Windows programming, and it assumes at least passing familiarity with the Windows API including Win32 and COM. Nor is this meant as an introduction to programming in Rust for Windows developers. You should also have a basic understanding of Rust and Cargo.
 
@@ -78,8 +78,8 @@ And we're done bootstraping the project. Now we'll move on to the code of the `s
 
 Inside of the main.rs file for the `spellchecker` crate, we'll start by adding the set up code. We'll initialize the COM runtime on the main thread. We'll make the `main` function return a `windows::Result` which is simply a standard `Result` type with the error hardcoded as a `windows::Error`.
 
-```rust 
-fn main() -> window::Result<()> {
+```rust
+fn main() -> windows::Result<()> {
     // initialize the main thread as a multithreaded apartment
     windows::initialize_mta()?;
     // The rest of the code will go here!
